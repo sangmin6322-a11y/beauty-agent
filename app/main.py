@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Dict
 
 import os
+import re
 import json
 from app.db import init_db, insert_log, fetch_logs
 from app.llm import call_llm
@@ -81,7 +82,16 @@ def chat(payload: ChatIn):
         return respond(session, "BRIEF", msg, data.get("question") or "한 가지만 더 알려줘.")
 
     # CHAT: LLM이 라우팅
-    data = call_llm(user_message=msg, brief_answers=[])
+    # 자동 슬롯 추출(초기 메시지에서 country/price/channel/category 등)
+
+    auto = extract_slots_from_text(msg)
+
+    for k, v in auto.items():
+
+        session.slots.setdefault(k, v)
+
+
+    data = call_llm(user_message=msg, brief_answers=[f"{k}:{v}" for k, v in session.slots.items()])
 
     if data.get("need_question"):
         session.state = State.BRIEF
@@ -139,5 +149,52 @@ def infer_slot(question: str) -> str:
         return "need"
     return "misc"
 
+
+
+
+import re
+
+def extract_slots_from_text(text: str) -> dict:
+    t = text.strip()
+
+    slots = {}
+
+    # country/region (아주 단순 룰)
+    if "미국" in t: slots["country"] = "미국"
+    elif "일본" in t: slots["country"] = "일본"
+    elif "중국" in t or "샤오홍수" in t: slots["country"] = "중국"
+    elif "유럽" in t: slots["country"] = "유럽"
+    elif "동남아" in t: slots["country"] = "동남아"
+
+    # category
+    if "선크림" in t: slots["category"] = "선크림"
+    elif "선스틱" in t: slots["category"] = "선스틱"
+    elif "수딩" in t and ("젤" in t or "겔" in t): slots["category"] = "수딩젤"
+    elif "선케어" in t: slots["category"] = "선케어"
+
+    # price band (예: 2~3만원대, 20~30달러)
+    m = re.search(r'(\d+)\s*~\s*(\d+)\s*만원대', t)
+    if m:
+        slots["price"] = f"{m.group(1)}~{m.group(2)}만원대"
+
+    # channel
+    channels = []
+    if "아마존" in t or "amazon" in t.lower(): channels.append("아마존")
+    if "올리브영" in t or "olive young" in t.lower(): channels.append("올리브영글로벌")
+    if "틱톡" in t or "tiktok" in t.lower(): channels.append("TikTok")
+    if "인스타" in t or "instagram" in t.lower(): channels.append("Instagram")
+    if "샤오홍수" in t or "red" in t.lower(): channels.append("RED")
+    if channels:
+        slots["channel"] = " + ".join(dict.fromkeys(channels))
+
+    # need (키워드)
+    needs = []
+    if "민감" in t: needs.append("민감피부")
+    if "진정" in t: needs.append("진정")
+    if "백탁" in t: needs.append("백탁 적음")
+    if needs:
+        slots["need"] = " / ".join(dict.fromkeys(needs))
+
+    return slots
 
 
