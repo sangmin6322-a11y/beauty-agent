@@ -1,4 +1,6 @@
 ﻿from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+import traceback
 from pydantic import BaseModel
 from dataclasses import dataclass, field
 from enum import Enum
@@ -51,7 +53,15 @@ def normalize_log_row(row):
     return {"ts": None, "state": None, "message": None, "reply": str(row), "slots_json": None}
 
 
-app = FastAPI(title="Beauty Agent", version="0.3.2")
+app = FastAPI(title="Beauty Agent", version="0.3.3")
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request, exc):
+    # 모든 500 에러를 JSON으로 보여줘서 원인 추적 가능하게 함
+    return JSONResponse(
+        status_code=500,
+        content={"error": repr(exc), "trace": traceback.format_exc()},
+    )
 
 init_db()
 
@@ -90,7 +100,7 @@ class RadarOut(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "version": "0.3.2"}
+    return {"ok": True, "version": "0.3.3"}
 
 @app.post("/chat", response_model=ChatOut)
 def chat(payload: ChatIn):
@@ -357,6 +367,7 @@ async def debug_radar(req: Request):
 
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()}
+
 
 
 
