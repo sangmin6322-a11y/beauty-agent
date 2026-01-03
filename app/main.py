@@ -71,7 +71,9 @@ def chat(payload: ChatIn):
             return respond(session, "CHAT", msg, data.get("reply", ""))
 
         # 계속 질문
-        session.pending_slot = data.get("slot") or "misc"
+        q = data.get("question") or ""
+
+        session.pending_slot = data.get("slot") or infer_slot(q)
         return respond(session, "BRIEF", msg, data.get("question") or "한 가지만 더 알려줘.")
 
     # CHAT: LLM이 라우팅
@@ -79,7 +81,9 @@ def chat(payload: ChatIn):
 
     if data.get("need_question"):
         session.state = State.BRIEF
-        session.pending_slot = data.get("slot") or "misc"
+        q = data.get("question") or ""
+
+        session.pending_slot = data.get("slot") or infer_slot(q)
         return respond(session, "BRIEF", msg, data.get("question") or "몇 가지만 물어볼게.")
 
     return respond(session, "CHAT", msg, data.get("reply", ""))
@@ -109,4 +113,22 @@ def history(user_id: str, limit: int = Query(20, ge=1, le=200)):
         {"ts": ts, "state": state, "message": message, "reply": reply, "slots_json": slots_json}
         for (ts, state, message, reply, slots_json) in rows
     ]
+
+
+def infer_slot(question: str) -> str:
+    q = question.lower()
+    if "국가" in question or "지역" in question or "country" in q or "region" in q:
+        return "country"
+    if "카테고리" in question or "선크림" in question or "선스틱" in question or "category" in q:
+        return "category"
+    if "가격" in question or "price" in q or "만원" in question:
+        return "price"
+    if "채널" in question or "유통" in question or "amazon" in q or "올리브영" in question or "channel" in q:
+        return "channel"
+    if "타겟" in question or "고객" in question or "target" in q:
+        return "target"
+    if "니즈" in question or "문제" in question or "need" in q:
+        return "need"
+    return "misc"
+
 
