@@ -79,3 +79,11 @@ def chat(payload: ChatIn):
         return ChatOut(user_id=session.user_id, state="BRIEF", reply=data.get("question") or "몇 가지만 물어볼게.")
 
     return ChatOut(user_id=session.user_id, state="CHAT", reply=data.get("reply", ""))
+
+@app.get("/")
+def root():
+    return {
+        "name": "Beauty Agent",
+        "status": "ok",
+        "endpoints": ["/health", "/chat"]
+    }
