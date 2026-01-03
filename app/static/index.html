@@ -46,5 +46,160 @@
   </div>
 
   <script src="/static/app.js"></script>
+<!-- ===== BEGIN_REPORT_BUTTON_V1 ===== -->
+<style>
+  #finalReportBtn {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 9999;
+    padding: 12px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(20,20,24,.92);
+    color: rgba(255,255,255,.92);
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(0,0,0,.35);
+    backdrop-filter: blur(8px);
+  }
+  #finalReportBtn:hover { transform: translateY(-1px); }
+  #finalReportBtn:active { transform: translateY(0px); }
+</style>
+
+<button id="finalReportBtn" title="현재 키워드로 최종 리포트(카드뉴스) 열기">
+  📌 최종 리포트 요약
+</button>
+
+<script>
+(function(){
+  function pickValue(selectors){
+    for (const sel of selectors){
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const v = (el.value ?? el.textContent ?? "").toString().trim();
+      if (v) return v;
+    }
+    return "";
+  }
+
+  function guessUserId(){
+    // 1) UI에 user_id input이 있으면 우선
+    let v = pickValue(["#user_id","input[name='user_id']","#uid","#userid"]);
+    if (v) return v;
+
+    // 2) localStorage에 저장된 경우(있으면)
+    try {
+      v = (localStorage.getItem("user_id") || "").trim();
+      if (v) return v;
+    } catch(e){}
+
+    // 3) fallback
+    return "test";
+  }
+
+  function guessQuery(){
+    // message 입력창/검색창으로 흔히 쓰는 id들 다 찍어봄
+    let q = pickValue(["#query","#message","#msg","#input","#text","textarea"]);
+    if (q) return q;
+
+    // 마지막으로 사용자에게 직접 입력 받기
+    q = prompt("리포트 생성할 검색 키워드를 입력해줘 (예: korean sunscreen white cast sensitive skin)");
+    return (q || "").trim();
+  }
+
+  document.getElementById("finalReportBtn").addEventListener("click", function(){
+    const userId = guessUserId();
+    const q = guessQuery();
+    if (!q) {
+      alert("query가 비어있어서 리포트를 열 수 없음.");
+      return;
+    }
+    const url = "/report/cards?user_id=" + encodeURIComponent(userId)
+              + "&query=" + encodeURIComponent(q)
+              + "&limit=25";
+    window.open(url, "_blank");
+  });
+})();
+</script>
+<!-- ===== END_REPORT_BUTTON_V1 ===== -->
+<!-- ===== BEGIN_REPORT_BUTTON_V1 ===== -->
+<style>
+  #finalReportBtn {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 9999;
+    padding: 12px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(20,20,24,.92);
+    color: rgba(255,255,255,.92);
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(0,0,0,.35);
+    backdrop-filter: blur(8px);
+  }
+  #finalReportBtn:hover { transform: translateY(-1px); }
+  #finalReportBtn:active { transform: translateY(0px); }
+</style>
+
+<button id="finalReportBtn" title="현재 키워드로 최종 리포트(카드뉴스) 열기">
+  📌 최종 리포트 요약
+</button>
+
+<script>
+(function(){
+  function pickValue(selectors){
+    for (const sel of selectors){
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const v = (el.value ?? el.textContent ?? "").toString().trim();
+      if (v) return v;
+    }
+    return "";
+  }
+
+  function guessUserId(){
+    // 1) UI에 user_id input이 있으면 우선
+    let v = pickValue(["#user_id","input[name='user_id']","#uid","#userid"]);
+    if (v) return v;
+
+    // 2) localStorage에 저장된 경우(있으면)
+    try {
+      v = (localStorage.getItem("user_id") || "").trim();
+      if (v) return v;
+    } catch(e){}
+
+    // 3) fallback
+    return "test";
+  }
+
+  function guessQuery(){
+    // message 입력창/검색창으로 흔히 쓰는 id들 다 찍어봄
+    let q = pickValue(["#query","#message","#msg","#input","#text","textarea"]);
+    if (q) return q;
+
+    // 마지막으로 사용자에게 직접 입력 받기
+    q = prompt("리포트 생성할 검색 키워드를 입력해줘 (예: korean sunscreen white cast sensitive skin)");
+    return (q || "").trim();
+  }
+
+  document.getElementById("finalReportBtn").addEventListener("click", function(){
+    const userId = guessUserId();
+    const q = guessQuery();
+    if (!q) {
+      alert("query가 비어있어서 리포트를 열 수 없음.");
+      return;
+    }
+    const url = "/report/cards?user_id=" + encodeURIComponent(userId)
+              + "&query=" + encodeURIComponent(q)
+              + "&limit=25";
+    window.open(url, "_blank");
+  });
+})();
+</script>
+<!-- ===== END_REPORT_BUTTON_V1 ===== -->
 </body>
 </html>
+

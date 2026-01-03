@@ -26,3 +26,7 @@ make_reset.py
 pulse.json
 patch_*.py
 patch_*.ps1
+*.bak_*
+*.ps1.bak_*
+app/*.bak_*
+app/static/*.bak_*
