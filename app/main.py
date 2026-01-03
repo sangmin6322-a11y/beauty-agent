@@ -6,6 +6,7 @@ from typing import Dict
 
 import os
 import re
+import re
 import json
 from app.db import init_db, insert_log, fetch_logs
 from app.llm import call_llm
@@ -67,9 +68,22 @@ def chat(payload: ChatIn):
 
             auto = extract_slots_from_text(msg)
 
-            for k, v in auto.items():
+            session.slots.update(auto)
+# 슬롯이 충분하면 LLM 추가 질문 없이 바로 종료
 
-                session.slots.setdefault(k, v)
+
+        if has_required_slots(session.slots):
+
+
+            session.state = State.CHAT
+
+
+            session.pending_slot = None
+
+
+            return respond(session, "CHAT", msg, render_launch_brief(session.slots))
+
+
 
         data = call_llm(user_message="(brief 답변) " + msg, brief_answers=[f"{k}:{v}" for k, v in session.slots.items()])
 
@@ -94,13 +108,8 @@ def chat(payload: ChatIn):
 
     auto = extract_slots_from_text(msg)
 
-    for k, v in auto.items():
-
-        session.slots.setdefault(k, v)
-
-
+    session.slots.update(auto)
     data = call_llm(user_message=msg, brief_answers=[f"{k}:{v}" for k, v in session.slots.items()])
-
     if data.get("need_question"):
         session.state = State.BRIEF
         q = data.get("question") or ""
@@ -194,6 +203,15 @@ def extract_slots_from_text(text: str) -> dict:
     if "샤오홍수" in t or "red" in t.lower(): channels.append("RED")
     if channels:
         slots["channel"] = " + ".join(dict.fromkeys(channels))
+    # target (예: 20~30대 여성 / 20대~30대 여성)
+    m = re.search(r'(\d+)\s*~\s*(\d+)\s*대\s*(여성|남성)?', t)
+    if m:
+        age = f"{m.group(1)}~{m.group(2)}대"
+        gender = (m.group(3) or "").strip()
+        slots["target"] = (age + (" " + gender if gender else "")).strip()
+    elif ("20대" in t and "30대" in t) or "20~30대" in t:
+        g = "여성" if "여성" in t else ("남성" if "남성" in t else "")
+        slots["target"] = (("20~30대") + (" " + g if g else "")).strip()
 
     # need (키워드)
     needs = []
@@ -204,6 +222,37 @@ def extract_slots_from_text(text: str) -> dict:
         slots["need"] = " / ".join(dict.fromkeys(needs))
 
     return slots
+
+
+
+
+REQUIRED_SLOTS = ["country", "category", "target", "need", "price", "channel"]
+
+def has_required_slots(slots: dict) -> bool:
+    return all(slots.get(k) for k in REQUIRED_SLOTS)
+
+def render_launch_brief(slots: dict) -> str:
+    country = slots.get("country", "N/A")
+    category = slots.get("category", "N/A")
+    target = slots.get("target", "N/A")
+    need = slots.get("need", "N/A")
+    price = slots.get("price", "N/A")
+    channel = slots.get("channel", "N/A")
+
+    core_claim = f"{target}을 위한 {need} 컨셉의 {category}"
+    next_action = "경쟁 제품/리뷰 기반 USP 3개 확정"
+
+    return (
+        "[Launch Brief]\n"
+        f"- Country/Region: {country}\n"
+        f"- Category: {category}\n"
+        f"- Target: {target}\n"
+        f"- Key Need: {need}\n"
+        f"- Price Band: {price}\n"
+        f"- Channel Mix: {channel}\n"
+        f"- Core Claim (한 문장): {core_claim}\n"
+        f"- Next Action (1개): {next_action}\n"
+    )
 
 
 
