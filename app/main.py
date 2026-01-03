@@ -11,6 +11,26 @@ import re
 import re
 import json
 from app.db import init_db, insert_log, fetch_logs
+
+def respond(session, state, message, reply):
+    """
+    공통 응답 헬퍼:
+    - 로그 저장(insert_log)
+    - ChatOut 반환
+    """
+    try:
+        import json
+        slots = getattr(session, "slots", None)
+        slots_json = json.dumps(slots, ensure_ascii=False) if slots else None
+    except Exception:
+        slots_json = None
+
+    try:
+        insert_log(session.user_id, state, message, reply, slots_json)
+    except Exception:
+        pass
+
+    return ChatOut(user_id=session.user_id, state=state, reply=reply)
 from app.llm import call_llm, call_radar
 from app.slots import extract_slots_from_text, infer_slot, has_required_slots, render_launch_brief
 from app.slots import extract_slots_from_text
@@ -251,6 +271,7 @@ async def debug_radar(req: Request):
 
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()}
+
 
 
 
