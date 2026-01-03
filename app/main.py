@@ -9,7 +9,7 @@ import re
 import re
 import json
 from app.db import init_db, insert_log, fetch_logs
-from app.llm import call_llm
+from app.llm import call_llm, call_radar
 
 app = FastAPI(title="Beauty Agent", version="0.3.1")
 
@@ -37,6 +37,15 @@ class ChatIn(BaseModel):
 class ChatOut(BaseModel):
     user_id: str
     state: str
+    reply: str
+
+class RadarIn(BaseModel):
+    user_id: str
+    brief: str | None = None
+    notes: str | None = None
+
+class RadarOut(BaseModel):
+    user_id: str
     reply: str
 
 @app.get("/health")
@@ -255,4 +264,27 @@ def render_launch_brief(slots: dict) -> str:
     )
 
 
+
+
+
+@app.post("/radar", response_model=RadarOut)
+def radar(payload: RadarIn):
+    user_id = payload.user_id
+    brief = (payload.brief or "").strip()
+    notes = (payload.notes or "").strip()
+
+    # brief가 없으면 DB history에서 최근 Launch Brief를 찾아 사용
+    if not brief:
+        logs = fetch_logs(user_id=user_id, limit=20)
+        for row in logs:
+            r = row.get("reply") or ""
+            if r.startswith("[Launch Brief]"):
+                brief = r
+                break
+
+    if not brief:
+        return RadarOut(user_id=user_id, reply="최근 Launch Brief를 찾지 못했어. 먼저 /chat으로 Launch Brief를 만들어줘.")
+
+    data = call_radar(launch_brief=brief, extra_notes=notes)
+    return RadarOut(user_id=user_id, reply=data.get("reply", ""))
 
