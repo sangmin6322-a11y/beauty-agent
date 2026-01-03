@@ -76,3 +76,41 @@ def fetch_logs(user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
 
     # sqlite3.Row -> dict
     return [dict(r) for r in rows]
+
+# --- Signals snapshots (for trend + alerts) ---
+def init_signals():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(\"\"\"
+    CREATE TABLE IF NOT EXISTS signals (
+        ts TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        payload_json TEXT
+    )
+    \"\"\")
+    conn.commit()
+    conn.close()
+
+def insert_signal(user_id: str, kind: str, payload_json: str):
+    from datetime import datetime
+    conn = get_conn()
+    cur = conn.cursor()
+    ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    cur.execute(
+        "INSERT INTO signals (ts, user_id, kind, payload_json) VALUES (?, ?, ?, ?)",
+        (ts, user_id, kind, payload_json),
+    )
+    conn.commit()
+    conn.close()
+
+def fetch_signals(user_id: str, limit: int = 20):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT ts, kind, payload_json FROM signals WHERE user_id=? ORDER BY ts DESC LIMIT ?",
+        (user_id, limit),
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return rows
