@@ -288,3 +288,32 @@ def radar(payload: RadarIn):
     data = call_radar(launch_brief=brief, extra_notes=notes)
     return RadarOut(user_id=user_id, reply=data.get("reply", ""))
 
+
+# ---- DEBUG ENDPOINTS (temporary) ----
+from fastapi import Request
+import traceback
+
+@app.post("/debug/radar")
+async def debug_radar(req: Request):
+    try:
+        body = await req.json()
+        user_id = (body.get("user_id") or "").strip()
+        extra_notes = body.get("extra_notes") or ""
+
+        logs = fetch_logs(user_id=user_id, limit=50)
+
+        launch = None
+        for row in logs:
+            r = (row.get("reply") or "")
+            if r.lstrip().startswith("[Launch Brief]"):
+                launch = r
+                break
+
+        if not launch:
+            return {"user_id": user_id, "reply": "no launch brief found", "logs_count": len(logs)}
+
+        radar = call_radar(launch_brief=launch, extra_notes=extra_notes)
+        return {"user_id": user_id, **radar}
+
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()}
