@@ -11,6 +11,46 @@ import json
 from app.db import init_db, insert_log, fetch_logs
 from app.llm import call_llm, call_radar
 
+def normalize_log_row(row):
+    """
+    fetch_logs가 dict / sqlite3.Row / tuple(list) 무엇을 주든
+    항상 {"ts","state","message","reply","slots_json"} dict로 변환한다.
+    """
+    if row is None:
+        return {"ts": None, "state": None, "message": None, "reply": "", "slots_json": None}
+
+    # already dict
+    if isinstance(row, dict):
+        return {
+            "ts": row.get("ts"),
+            "state": row.get("state"),
+            "message": row.get("message"),
+            "reply": row.get("reply"),
+            "slots_json": row.get("slots_json"),
+        }
+
+    # sqlite3.Row 같은 mapping
+    try:
+        if hasattr(row, "keys"):
+            return {
+                "ts": row["ts"] if "ts" in row.keys() else None,
+                "state": row["state"] if "state" in row.keys() else None,
+                "message": row["message"] if "message" in row.keys() else None,
+                "reply": row["reply"] if "reply" in row.keys() else "",
+                "slots_json": row["slots_json"] if "slots_json" in row.keys() else None,
+            }
+    except Exception:
+        pass
+
+    # tuple/list
+    if isinstance(row, (tuple, list)) and len(row) >= 5:
+        ts, state, message, reply, slots_json = row[0], row[1], row[2], row[3], row[4]
+        return {"ts": ts, "state": state, "message": message, "reply": reply, "slots_json": slots_json}
+
+    # fallback
+    return {"ts": None, "state": None, "message": None, "reply": str(row), "slots_json": None}
+
+
 app = FastAPI(title="Beauty Agent", version="0.3.1")
 
 init_db()
@@ -300,7 +340,7 @@ async def debug_radar(req: Request):
         user_id = (body.get("user_id") or "").strip()
         extra_notes = body.get("extra_notes") or ""
 
-        logs = fetch_logs(user_id=user_id, limit=50)
+        logs = [normalize_log_row(r) for r in fetch_logs(user_id=user_id, limit=50)]
 
         launch = None
         for row in logs:
@@ -317,3 +357,5 @@ async def debug_radar(req: Request):
 
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()}
+
+
