@@ -58,9 +58,8 @@ def call_llm(user_message: str, brief_answers: list[str]) -> dict:
 
 
 
-
 def call_radar(launch_brief: str, extra_notes: str = "") -> dict:
-    # Radar는: (1) 핵심 인사이트 (2) 리뷰/FAQ 가설 (3) 경쟁/차별화 포인트 (4) 다음 액션을 뽑는다
+    # Radar: (1) 핵심 인사이트 (2) 리뷰/FAQ 리스크 (3) 차별화 각도 (4) 다음 리서치 액션
     system = (
         "You are a K-Beauty product/marketing strategist. "
         "Given a Launch Brief, create a concise 'Radar' report: "
@@ -71,15 +70,15 @@ def call_radar(launch_brief: str, extra_notes: str = "") -> dict:
         "Write in Korean. Keep it practical and specific."
     )
 
-    user = f\"\"\"[Launch Brief]
+    user = f"""[Launch Brief]
 {launch_brief}
 
 [Extra Notes]
 {extra_notes}
-\"\"\"
+"""
 
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
 
     client = OpenAI(api_key=api_key)
     resp = client.responses.create(
@@ -95,7 +94,6 @@ def call_radar(launch_brief: str, extra_notes: str = "") -> dict:
     try:
         text = resp.output_text
     except Exception:
-        # fallback
         text = str(resp)
 
-    return {"reply": text.strip()}
+    return {"reply": (text or "").strip()}
