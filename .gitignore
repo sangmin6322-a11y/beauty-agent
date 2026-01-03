@@ -3,3 +3,10 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+.venv/
+__pycache__/
+*.pyc
+.env
+data/
+payload*.json
+make_payload*.py
