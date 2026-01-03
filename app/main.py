@@ -12,6 +12,7 @@ import re
 import re
 import json
 from app.db import init_db, insert_log, fetch_logs
+from app.signals import fetch_reddit, build_pulse_from_signals, build_alerts_from_signals
 from app.insights import make_pulse, make_alerts
 
 def respond(session, state, message, reply):
@@ -36,6 +37,11 @@ def respond(session, state, message, reply):
 from app.llm import call_llm, call_radar
 from app.slots import extract_slots_from_text, infer_slot, has_required_slots, render_launch_brief
 from app.slots import extract_slots_from_text
+
+# --- AUTO PATCH: social pulse (do not edit by hand) ---
+from app.signals import fetch_social_signals, build_pulse_from_signals, build_alerts_from_signals
+# --- /AUTO PATCH ---
+
 
 def normalize_log_row(row):
     """
@@ -286,10 +292,27 @@ async def debug_radar(req: Request):
 
 
 
+
 @app.get("/pulse")
-def pulse(user_id: str, limit: int = 50):
-    rows = fetch_logs(user_id=user_id, limit=limit)
-    return make_pulse(rows)
+def pulse(user_id: str, query: str = "", limit: int = 25):
+    q = (query or "").strip()
+    lim = max(1, min(int(limit or 25), 200))
+    # query가 있으면 즉시 SNS/커뮤니티/뉴스 신호를 수집해 pulse 생성
+    signals = fetch_social_signals(q, limit=lim) if q else []
+    pulse = build_pulse_from_signals(signals)
+    pulse["window"] = {"logs_count": 0, "signals_count": len(signals)}
+    return pulse
+
+@app.post("/pulse")
+def pulse_post(payload: dict):
+    user_id = (payload.get("user_id") or "").strip()
+    query = (payload.get("query") or "").strip()
+    limit = int(payload.get("limit") or 25)
+    signals = fetch_social_signals(query, limit=limit)
+    pulse = build_pulse_from_signals(signals)
+    pulse["window"] = {"logs_count": 0, "signals_count": len(signals)}
+    return pulse
+
 
 @app.get("/alerts")
 def alerts(user_id: str, limit: int = 50):

@@ -81,14 +81,14 @@ def fetch_logs(user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
 def init_signals():
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute(\"\"\"
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS signals (
         ts TEXT NOT NULL,
         user_id TEXT NOT NULL,
         kind TEXT NOT NULL,
         payload_json TEXT
     )
-    \"\"\")
+    """)
     conn.commit()
     conn.close()
 
@@ -114,3 +114,4 @@ def fetch_signals(user_id: str, limit: int = 20):
     rows = cur.fetchall()
     conn.close()
     return rows
+

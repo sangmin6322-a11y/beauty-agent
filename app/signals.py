@@ -1,128 +1,210 @@
-﻿import re
-from collections import Counter
+﻿
+import os
+import re
+import json
+from datetime import datetime, timezone
+from typing import List, Dict, Any, Optional
 
-# 매우 라이트한 룰 기반 시그널 추출기 (외부 크롤링 없이 "입력된 텍스트" 기준)
-INGREDIENTS = [
-    "centella", "cica", "madecassoside", "panthenol", "ceramide", "hyaluronic",
-    "niacinamide", "zinc", "titanium dioxide", "zinc oxide",
-    "시카", "센텔라", "마데카소사이드", "판테놀", "세라마이드", "히알루론산", "나이아신아마이드",
-    "징크", "티타늄", "징크옥사이드"
-]
+import httpx
 
-TEXTURES = [
-    "gel", "essence", "serum", "watery", "milk", "cream", "stick", "lotion", "fluid",
-    "젤", "에센스", "세럼", "워터리", "밀크", "크림", "스틱", "로션", "플루이드"
-]
+# -------------------------
+# Utilities
+# -------------------------
+def _now_iso():
+    return datetime.now(timezone.utc).isoformat()
 
-CLAIMS = [
-    "soothing", "calming", "sensitive", "no white cast", "whitecast", "non-greasy",
-    "fragrance-free", "reef-safe", "non-comedogenic", "mineral", "chemical", "hybrid",
-    "SPF", "PA++++", "broad spectrum",
-    "진정", "민감", "저자극", "백탁", "백탁없", "끈적", "무향", "향료무", "논코메도",
-    "무기자차", "유기자차", "혼합자차", "SPF", "PA++++", "광범위"
-]
+def normalize_created_at(s: str) -> str:
+    # best-effort normalize to ISO; if unknown just return now
+    try:
+        # if already iso-like
+        if "T" in s and ("+" in s or "Z" in s):
+            return s.replace("Z", "+00:00")
+        # unix?
+        if s.isdigit():
+            return datetime.fromtimestamp(int(s), tz=timezone.utc).isoformat()
+    except Exception:
+        pass
+    return _now_iso()
 
-PAINS = [
-    "white cast", "whitecast", "pilling", "greasy", "sticky", "irritation", "sting",
-    "breakout", "acne", "dry", "burn", "allergy",
-    "백탁", "밀림", "번들", "끈적", "자극", "따가", "트러블", "여드름", "건조", "화끈", "알러지"
-]
+def _truncate(t: str, n: int = 220) -> str:
+    t = (t or "").strip().replace("\n", " ")
+    return t[:n]
 
-POS_WORDS = ["love", "great", "amazing", "recommend", "works", "holy grail", "good", "smooth", "light",
-             "좋", "추천", "만족", "재구매", "인생템", "가벼", "부드", "편하", "최고"]
-NEG_WORDS = ["hate", "bad", "worst", "burn", "irritat", "breakout", "doesn't", "not work",
-             "별로", "최악", "실망", "자극", "따갑", "트러블", "환불", "안맞", "안되"]
+# -------------------------
+# Fetchers (policy-safe)
+# -------------------------
 
-def _norm(s: str) -> str:
-    return (s or "").strip()
+def fetch_reddit(query: str, limit: int = 25) -> List[Dict[str, Any]]:
+    """
+    Public reddit search JSON. (No login / no bypass)
+    """
+    q = (query or "").strip()
+    if not q:
+        return []
+    lim = max(1, min(int(limit or 25), 100))
+    url = "https://www.reddit.com/search.json"
+    headers = {"User-Agent": "beauty-agent/0.1 (by u/yourteam)"}  # required-ish
+    params = {"q": q, "limit": lim, "sort": "new"}
+    out = []
+    try:
+        with httpx.Client(timeout=15.0, headers=headers, follow_redirects=True) as c:
+            r = c.get(url, params=params)
+            r.raise_for_status()
+            data = r.json()
+        for ch in (data.get("data", {}).get("children", []) or []):
+            d = ch.get("data", {}) or {}
+            permalink = d.get("permalink") or ""
+            out.append({
+                "source": "reddit",
+                "platform": "reddit",
+                "created_at": normalize_created_at(str(d.get("created_utc") or "")),
+                "url": ("https://www.reddit.com" + permalink) if permalink else (d.get("url") or ""),
+                "title": d.get("title") or "",
+                "text": _truncate(d.get("selftext") or ""),
+                "metrics": {
+                    "score": d.get("score") or 0,
+                    "comments": d.get("num_comments") or 0,
+                    "subreddit": d.get("subreddit") or ""
+                }
+            })
+    except Exception:
+        return []
+    return out
 
-def _find_snippets(text: str, term: str, window: int = 40, max_snip: int = 4):
-    t = text
-    snips = []
-    for m in re.finditer(re.escape(term), t, flags=re.IGNORECASE):
-        a = max(0, m.start() - window)
-        b = min(len(t), m.end() + window)
-        snip = t[a:b].replace("\n", " ").strip()
-        if snip and snip not in snips:
-            snips.append(snip)
-        if len(snips) >= max_snip:
-            break
-    return snips
+def fetch_google_news_rss(query: str, limit: int = 25) -> List[Dict[str, Any]]:
+    """
+    Public Google News RSS search (no key). Good for 'retail/news chatter' signals.
+    """
+    q = (query or "").strip()
+    if not q:
+        return []
+    lim = max(1, min(int(limit or 25), 50))
+    # NOTE: RSS is public; we only parse XML.
+    url = "https://news.google.com/rss/search"
+    params = {"q": q, "hl": "en-US", "gl": "US", "ceid": "US:en"}
+    headers = {"User-Agent": "beauty-agent/0.1"}
+    out = []
+    try:
+        with httpx.Client(timeout=15.0, headers=headers, follow_redirects=True) as c:
+            r = c.get(url, params=params)
+            r.raise_for_status()
+            xml = r.text
+        # minimal xml parsing without extra deps
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(xml)
+        items = root.findall(".//item")[:lim]
+        for it in items:
+            title = (it.findtext("title") or "").strip()
+            link = (it.findtext("link") or "").strip()
+            pub = (it.findtext("pubDate") or "").strip()
+            desc = (it.findtext("description") or "").strip()
+            out.append({
+                "source": "google_news_rss",
+                "platform": "news",
+                "created_at": normalize_created_at(pub),
+                "url": link,
+                "title": title,
+                "text": _truncate(desc),
+                "metrics": {}
+            })
+    except Exception:
+        return []
+    return out
 
-def extract_signals(text: str) -> dict:
-    t = _norm(text)
-    tl = t.lower()
+def fetch_serper_search(*args, **kwargs):
+    return []
 
-    # 간이 감성
-    pos = sum(1 for w in POS_WORDS if w.lower() in tl)
-    neg = sum(1 for w in NEG_WORDS if w.lower() in tl)
-    sentiment = "pos" if pos > neg else ("neg" if neg > pos else "mixed")
 
-    def count_terms(terms):
-        c = Counter()
-        for term in terms:
-            if term.lower() in tl:
-                c[term] += tl.count(term.lower())
-        return c
+NEED_LEX = {
+    "sensitive/soothing": [r"\bsensitive\b", r"\bsooth(ing|e)?\b", r"\bcalm(ing)?\b", r"\birritat(ed|ion)\b"],
+    "no-white-cast": [r"white cast", r"\bno[- ]?cast\b", r"\binvisible\b", r"\btransparent\b"],
+    "lightweight": [r"\blightweight\b", r"\bnon[- ]?greasy\b", r"\bfast[- ]?absor(b|ption)\b"],
+    "hydrating": [r"\bhydrat(ing|ion)\b", r"\bmoistur(ize|izing|izing)\b", r"\bdewy\b"],
+}
 
-    ing = count_terms(INGREDIENTS)
-    tex = count_terms(TEXTURES)
-    clm = count_terms(CLAIMS)
-    pain = count_terms(PAINS)
+def _count_lex(signals: List[Dict[str, Any]], lex: Dict[str, List[str]]) -> Dict[str, int]:
+    counts = {k: 0 for k in lex.keys()}
+    for s in (signals or []):
+        txt = ((s.get("title") or "") + " " + (s.get("text") or "")).lower()
+        for k, pats in lex.items():
+            for p in pats:
+                if re.search(p, txt):
+                    counts[k] += 1
+                    break
+    # drop zeros
+    return {k: v for k, v in counts.items() if v > 0}
 
-    # 키워드(간단 토큰)
-    tokens = re.findall(r"[A-Za-z가-힣0-9\+\#]{2,}", t)
-    top_tokens = [w for (w, n) in Counter([x.lower() for x in tokens]).most_common(20)]
+def build_pulse_from_signals(signals: List[Dict[str, Any]]) -> Dict[str, Any]:
+    risks = _count_lex(signals, RISK_LEX)
+    needs = _count_lex(signals, NEED_LEX)
 
-    # 근거 스니펫: pain/claim 중심
-    evidence = []
-    for term, _ in (pain.most_common(5) + clm.most_common(5)):
-        for snip in _find_snippets(t, term):
-            evidence.append({"term": term, "snippet": snip})
-        if len(evidence) >= 12:
-            break
+    # evidence: keep top 8 with url+snippet
+    evidence = [{
+        "source": s.get("source"),
+        "platform": s.get("platform"),
+        "title": s.get("title"),
+        "url": s.get("url"),
+        "snippet": _truncate(s.get("text") or "", 180),
+    } for s in (signals or [])[:8]]
+
+    insights = []
+    if needs:
+        top = sorted(needs.items(), key=lambda x: x[1], reverse=True)[:5]
+        insights.append({
+            "title": "湲濡쒕쾶 怨좉컼??湲곕??섎뒗 ?ъ씤???덉쫰) ?곸쐞",
+            "summary": "SNS/由ы뀒???좏샇?먯꽌 諛섎났 ?깆옣???덉쫰 ?ㅼ썙??湲곗? ?곸쐞 ??ぉ.",
+            "top": top,
+            "evidence": evidence[:4],
+        })
+    if risks:
+        top = sorted(risks.items(), key=lambda x: x[1], reverse=True)[:5]
+        insights.append({
+            "title": "由щ럭/FAQ 由ъ뒪???곸쐞",
+            "summary": "遺덈쭔/由ъ뒪???ㅼ썙???멸툒??湲곕컲 ?곸쐞 ??ぉ.",
+            "top": top,
+            "evidence": evidence[:4],
+        })
+    if not insights:
+        insights.append({
+        "title": "",
+            "summary": "?꾩옱 荑쇰━?먯꽌 ?좎쓽誘명븳 ?좏샇媛 異⑸텇???섏쭛?섏? ?딆븯?? (?ㅼ썙??援ъ껜??沅뚯옣)",
+            "top": [],
+            "evidence": evidence[:4],
+        })
 
     return {
-        "sentiment": sentiment,
-        "counts": {
-            "ingredients": dict(ing),
-            "textures": dict(tex),
-            "claims": dict(clm),
-            "pains": dict(pain),
-        },
-        "top_tokens": top_tokens,
-        "evidence_snippets": evidence,
-        "raw_len": len(t),
+        "signals_count": len(signals or []),
+        "evidence": evidence,
+        "insights": insights,
     }
 
-def merge_signals(signals_list: list[dict]) -> dict:
-    out = {"sentiment": "mixed", "counts": {"ingredients":{}, "textures":{}, "claims":{}, "pains":{}},
-           "top_tokens": [], "evidence_snippets": []}
+def build_alerts_from_signals(signals: List[Dict[str, Any]], threshold: int = 4) -> Dict[str, Any]:
+    risks = _count_lex(signals, RISK_LEX)
+    alerts = []
+    for k, v in sorted(risks.items(), key=lambda x: x[1], reverse=True):
+        if v >= threshold:
+            alerts.append({
+                "type": "review_risk",
+                "risk": k,
+                "count": v,
+                "message": f"由ъ뒪??'{k}' ?멸툒??{v}嫄?愿李곕맖. FAQ/?쒗삎 蹂댁셿 ?ъ씤???먭? ?꾩슂."
+            })
+    return {"alerts": alerts, "signals_count": len(signals or [])}
 
-    c_ing = Counter()
-    c_tex = Counter()
-    c_clm = Counter()
-    c_pain = Counter()
-    tok = Counter()
-    sent = Counter()
 
-    for s in signals_list:
-        sent[s.get("sentiment","mixed")] += 1
-        for k, v in (s.get("counts", {}).get("ingredients", {}) or {}).items(): c_ing[k] += int(v)
-        for k, v in (s.get("counts", {}).get("textures", {}) or {}).items(): c_tex[k] += int(v)
-        for k, v in (s.get("counts", {}).get("claims", {}) or {}).items(): c_clm[k] += int(v)
-        for k, v in (s.get("counts", {}).get("pains", {}) or {}).items(): c_pain[k] += int(v)
-        for w in (s.get("top_tokens") or []): tok[w] += 1
-        for e in (s.get("evidence_snippets") or []):
-            if len(out["evidence_snippets"]) < 20:
-                out["evidence_snippets"].append(e)
+# --- Added: unified social signals fetcher (alias) ---
+def fetch_social_signals(query: str, limit: int = 25):
+    """
+    Unified social signals fetcher.
+    Currently uses Reddit as the primary signal source.
+    Future: TikTok/Instagram/RED(Xiaohongshu)/YouTube/OliveYoung Global can be added here.
+    """
+    q = (query or "").strip()
+    lim = max(1, min(int(limit or 25), 200))
 
-    out["counts"]["ingredients"] = dict(c_ing.most_common(15))
-    out["counts"]["textures"] = dict(c_tex.most_common(15))
-    out["counts"]["claims"] = dict(c_clm.most_common(20))
-    out["counts"]["pains"] = dict(c_pain.most_common(20))
-    out["top_tokens"] = [w for (w, n) in tok.most_common(25)]
+    # Prefer existing fetch_reddit if available
+    if "fetch_reddit" in globals() and callable(globals().get("fetch_reddit")):
+        return fetch_reddit(q, limit=lim)
 
-    # 최빈 감성
-    out["sentiment"] = sent.most_common(1)[0][0] if sent else "mixed"
-    return out
+    # Fallback: empty list (prevents server crash)
+    return []

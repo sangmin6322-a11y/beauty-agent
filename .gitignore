@@ -20,3 +20,9 @@ make_m1.py
 make_m2.py
 make_m3.py
 make_reset.py
+
+# local patch/backup/test artifacts
+*.bak
+pulse.json
+patch_*.py
+patch_*.ps1
