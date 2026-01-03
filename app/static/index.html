@@ -46,165 +46,12 @@
   </div>
 
   <script src="/static/app.js"></script>
-<!-- ===== BEGIN_REPORT_BUTTON_V1 ===== -->
+
+
+<!-- ===== BEGIN_REPORT_BUTTON_V3 ===== -->
 <style>
-  #finalReportBtn {
-    position: fixed;
-    right: 18px;
-    bottom: 18px;
-    z-index: 9999;
-    padding: 12px 14px;
-    border-radius: 999px;
-    border: 1px solid rgba(255,255,255,.18);
-    background: rgba(20,20,24,.92);
-    color: rgba(255,255,255,.92);
-    font-weight: 800;
-    cursor: pointer;
-    box-shadow: 0 10px 28px rgba(0,0,0,.35);
-    backdrop-filter: blur(8px);
-  }
-  #finalReportBtn:hover { transform: translateY(-1px); }
-  #finalReportBtn:active { transform: translateY(0px); }
-</style>
-
-<button id="finalReportBtn" title="현재 키워드로 최종 리포트(카드뉴스) 열기">
-  📌 최종 리포트 요약
-</button>
-
-<script>
-(function(){
-  function pickValue(selectors){
-    for (const sel of selectors){
-      const el = document.querySelector(sel);
-      if (!el) continue;
-      const v = (el.value ?? el.textContent ?? "").toString().trim();
-      if (v) return v;
-    }
-    return "";
-  }
-
-  function guessUserId(){
-    // 1) UI에 user_id input이 있으면 우선
-    let v = pickValue(["#user_id","input[name='user_id']","#uid","#userid"]);
-    if (v) return v;
-
-    // 2) localStorage에 저장된 경우(있으면)
-    try {
-      v = (localStorage.getItem("user_id") || "").trim();
-      if (v) return v;
-    } catch(e){}
-
-    // 3) fallback
-    return "test";
-  }
-
-  function guessQuery(){
-    // message 입력창/검색창으로 흔히 쓰는 id들 다 찍어봄
-    let q = pickValue(["#query","#message","#msg","#input","#text","textarea"]);
-    if (q) return q;
-
-    // 마지막으로 사용자에게 직접 입력 받기
-    q = prompt("리포트 생성할 검색 키워드를 입력해줘 (예: korean sunscreen white cast sensitive skin)");
-    return (q || "").trim();
-  }
-
-  document.getElementById("finalReportBtn").addEventListener("click", function(){
-    const userId = guessUserId();
-    const q = guessQuery();
-    if (!q) {
-      alert("query가 비어있어서 리포트를 열 수 없음.");
-      return;
-    }
-    const url = "/report/cards?user_id=" + encodeURIComponent(userId)
-              + "&query=" + encodeURIComponent(q)
-              + "&limit=25";
-    window.open(url, "_blank");
-  });
-})();
-</script>
-<!-- ===== END_REPORT_BUTTON_V1 ===== -->
-<!-- ===== BEGIN_REPORT_BUTTON_V1 ===== -->
-<style>
-  #finalReportBtn {
-    position: fixed;
-    right: 18px;
-    bottom: 18px;
-    z-index: 9999;
-    padding: 12px 14px;
-    border-radius: 999px;
-    border: 1px solid rgba(255,255,255,.18);
-    background: rgba(20,20,24,.92);
-    color: rgba(255,255,255,.92);
-    font-weight: 800;
-    cursor: pointer;
-    box-shadow: 0 10px 28px rgba(0,0,0,.35);
-    backdrop-filter: blur(8px);
-  }
-  #finalReportBtn:hover { transform: translateY(-1px); }
-  #finalReportBtn:active { transform: translateY(0px); }
-</style>
-
-<button id="finalReportBtn" title="현재 키워드로 최종 리포트(카드뉴스) 열기">
-  📌 최종 리포트 요약
-</button>
-
-<script>
-(function(){
-  function pickValue(selectors){
-    for (const sel of selectors){
-      const el = document.querySelector(sel);
-      if (!el) continue;
-      const v = (el.value ?? el.textContent ?? "").toString().trim();
-      if (v) return v;
-    }
-    return "";
-  }
-
-  function guessUserId(){
-    // 1) UI에 user_id input이 있으면 우선
-    let v = pickValue(["#user_id","input[name='user_id']","#uid","#userid"]);
-    if (v) return v;
-
-    // 2) localStorage에 저장된 경우(있으면)
-    try {
-      v = (localStorage.getItem("user_id") || "").trim();
-      if (v) return v;
-    } catch(e){}
-
-    // 3) fallback
-    return "test";
-  }
-
-  function guessQuery(){
-    // message 입력창/검색창으로 흔히 쓰는 id들 다 찍어봄
-    let q = pickValue(["#query","#message","#msg","#input","#text","textarea"]);
-    if (q) return q;
-
-    // 마지막으로 사용자에게 직접 입력 받기
-    q = prompt("리포트 생성할 검색 키워드를 입력해줘 (예: korean sunscreen white cast sensitive skin)");
-    return (q || "").trim();
-  }
-
-  document.getElementById("finalReportBtn").addEventListener("click", function(){
-    const userId = guessUserId();
-    const q = guessQuery();
-    if (!q) {
-      alert("query가 비어있어서 리포트를 열 수 없음.");
-      return;
-    }
-    const url = "/report/cards?user_id=" + encodeURIComponent(userId)
-              + "&query=" + encodeURIComponent(q)
-              + "&limit=25";
-    window.open(url, "_blank");
-  });
-})();
-</script>
-<!-- ===== END_REPORT_BUTTON_V1 ===== -->
-
-<!-- ===== BEGIN_REPORT_BUTTON_V2 ===== -->
-<style>
-  #finalReportBtn{
-    position:fixed; right:18px; bottom:18px; z-index:9999;
+  #finalReportBtnV3{
+    position:fixed; right:18px; bottom:18px; z-index:2147483647;
     padding:12px 14px; border-radius:999px;
     border:1px solid rgba(255,255,255,.18);
     background:rgba(20,20,24,.92);
@@ -213,46 +60,122 @@
     box-shadow:0 10px 28px rgba(0,0,0,.35);
     backdrop-filter: blur(8px);
   }
+  #finalReportBtnV3:hover{ transform: translateY(-1px); }
+  #finalReportBtnV3:active{ transform: translateY(0); }
 </style>
-<button id="finalReportBtn" title="마지막 query로 카드뉴스 리포트 열기">📌 최종 리포트 요약</button>
+
 <script>
 (function(){
-  function pickValue(selectors){
-    for (const sel of selectors){
-      const el = document.querySelector(sel);
-      if (!el) continue;
-      const v = (el.value ?? el.textContent ?? "").toString().trim();
-      if (v) return v;
-    }
+  function log(){ try{ console.log("[report-btn]", ...arguments); }catch(e){} }
+
+  function safeGetLS(k){
+    try{ return (localStorage.getItem(k) || "").trim(); }catch(e){ return ""; }
+  }
+  function safeSetLS(k,v){
+    try{ localStorage.setItem(k, (v||"").toString()); }catch(e){}
+  }
+
+  function pickTextFrom(el){
+    if (!el) return "";
+    if (typeof el.value === "string" && el.value.trim()) return el.value.trim();
+    if (el.isContentEditable && el.textContent && el.textContent.trim()) return el.textContent.trim();
+    if (el.textContent && el.textContent.trim()) return el.textContent.trim();
     return "";
   }
-  function lastQuery(){ try { return (localStorage.getItem("last_query")||"").trim(); } catch(e){ return ""; } }
-  function setLastQuery(q){ try { localStorage.setItem("last_query", q); } catch(e){} }
 
-  document.addEventListener("input", function(ev){
-    const t = ev.target;
-    if (!t) return;
-    const id = (t.id || "").toLowerCase();
-    if (id.includes("query") || id.includes("message") || id.includes("input") || t.tagName === "TEXTAREA"){
-      const v = (t.value || "").trim();
-      if (v.length >= 3) setLastQuery(v);
+  function guessUserId(){
+    const candidates = [
+      document.querySelector("#user_id"),
+      document.querySelector("input[name='user_id']"),
+      document.querySelector("#uid"),
+      document.querySelector("#userid")
+    ].filter(Boolean);
+    for (const el of candidates){
+      const v = pickTextFrom(el);
+      if (v) return v;
     }
-  }, true);
+    const v2 = safeGetLS("user_id");
+    return v2 || "test";
+  }
 
-  document.getElementById("finalReportBtn").addEventListener("click", function(){
-    let q = pickValue(["#query","#message","#msg","#input","#text","textarea"]) || lastQuery();
-    if (!q){
-      q = prompt("리포트 생성할 검색 키워드 입력") || "";
-      q = q.trim();
-      if (!q) { alert("query가 비어있음"); return; }
-      setLastQuery(q);
+  function guessQuery(){
+    const selectors = [
+      "#query","#message","#msg","#input","#text",
+      "textarea","input[type='text']","input[type='search']",
+      "[contenteditable='true']",
+      ".ProseMirror", ".ql-editor"
+    ];
+    for (const sel of selectors){
+      const el = document.querySelector(sel);
+      const v = pickTextFrom(el);
+      if (v && v.length >= 3) return v;
     }
-    const url = "/report/cards?user_id=test&query=" + encodeURIComponent(q) + "&limit=25";
-    window.open(url, "_blank");
-  });
+
+    const last = safeGetLS("last_query");
+    if (last && last.length >= 3) return last;
+
+    const p = prompt("리포트 생성할 검색 키워드 입력\n예: korean sunscreen white cast sensitive skin", last || "");
+    return (p || "").trim();
+  }
+
+  function openReport(){
+    const userId = guessUserId();
+    const q = guessQuery();
+    if (!q) { alert("query가 비어있어서 리포트를 열 수 없음."); return; }
+    safeSetLS("last_query", q);
+
+    const base = window.location.origin;
+    const url = base + "/report/cards?user_id=" + encodeURIComponent(userId)
+              + "&query=" + encodeURIComponent(q)
+              + "&limit=25";
+    log("open", url);
+    window.open(url, "_blank", "noopener");
+  }
+
+  function attach(){
+    if (document.getElementById("finalReportBtnV3")) return;
+
+    const btn = document.createElement("button");
+    btn.id = "finalReportBtnV3";
+    btn.type = "button";
+    btn.title = "마지막 query로 카드뉴스 리포트 열기";
+    btn.textContent = "📌 최종 리포트 요약";
+    btn.addEventListener("click", openReport);
+    document.body.appendChild(btn);
+
+    document.addEventListener("input", function(ev){
+      const t = ev.target;
+      if (!t) return;
+      const id = (t.id || "").toLowerCase();
+      const cls = (t.className || "").toString().toLowerCase();
+      const tag = (t.tagName || "").toLowerCase();
+
+      const looksLikeInput =
+        tag === "textarea" ||
+        tag === "input" ||
+        t.isContentEditable ||
+        id.includes("query") || id.includes("message") || id.includes("input") ||
+        cls.includes("query") || cls.includes("message") || cls.includes("input") ||
+        cls.includes("prosemirror") || cls.includes("ql-editor");
+
+      if (!looksLikeInput) return;
+
+      const v = pickTextFrom(t);
+      if (v && v.length >= 3) safeSetLS("last_query", v);
+    }, true);
+
+    log("attached");
+  }
+
+  if (document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", attach);
+  } else {
+    attach();
+  }
 })();
 </script>
-<!-- ===== END_REPORT_BUTTON_V2 ===== -->
+<!-- ===== END_REPORT_BUTTON_V3 ===== -->
+
 </body>
 </html>
 
