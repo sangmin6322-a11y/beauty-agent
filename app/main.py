@@ -63,6 +63,14 @@ def chat(payload: ChatIn):
         if session.pending_slot:
             session.slots[session.pending_slot] = msg
 
+            # BRIEF 답변에서도 자동 슬롯 추출(가격/채널/니즈 등)
+
+            auto = extract_slots_from_text(msg)
+
+            for k, v in auto.items():
+
+                session.slots.setdefault(k, v)
+
         data = call_llm(user_message="(brief 답변) " + msg, brief_answers=[f"{k}:{v}" for k, v in session.slots.items()])
 
         # final이면 종료
@@ -196,5 +204,6 @@ def extract_slots_from_text(text: str) -> dict:
         slots["need"] = " / ".join(dict.fromkeys(needs))
 
     return slots
+
 
 
