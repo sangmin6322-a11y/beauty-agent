@@ -135,7 +135,7 @@ def _count_lex(signals: List[Dict[str, Any]], lex: Dict[str, List[str]]) -> Dict
     return {k: v for k, v in counts.items() if v > 0}
 
 def build_pulse_from_signals(signals: List[Dict[str, Any]]) -> Dict[str, Any]:
-    risks = _count_lex(signals, RISK_LEX)
+    risks = _count_lex(signals, globals().get("RISK_LEX", DEFAULT_RISK_LEX))
     needs = _count_lex(signals, NEED_LEX)
 
     # evidence: keep top 8 with url+snippet
@@ -179,7 +179,7 @@ def build_pulse_from_signals(signals: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 def build_alerts_from_signals(signals: List[Dict[str, Any]], threshold: int = 4) -> Dict[str, Any]:
-    risks = _count_lex(signals, RISK_LEX)
+    risks = _count_lex(signals, globals().get("RISK_LEX", DEFAULT_RISK_LEX))
     alerts = []
     for k, v in sorted(risks.items(), key=lambda x: x[1], reverse=True):
         if v >= threshold:
@@ -208,3 +208,220 @@ def fetch_social_signals(query: str, limit: int = 25):
 
     # Fallback: empty list (prevents server crash)
     return []
+
+
+# --- Lexicons (added to prevent NameError) ---
+# risk lexicon: 키 = 리스크 타입, 값 = 매칭할 키워드 리스트
+RISK_LEX = {
+    "white_cast": ["white cast", "whitecast", "ashy", "gray cast", "tone-up too much", "톤업 과함", "백탁", "회색끼"],
+    "pilling": ["pilling", "pill", "balls up", "rolling", "밀림", "때처럼", "각질처럼"],
+    "breakouts": ["breakout", "breakouts", "acne", "pimples", "clog", "comedone", "트러블", "여드름", "모공 막힘"],
+    "stings_eyes": ["stings eyes", "burns eyes", "eye sting", "irritates eyes", "눈시림", "눈 따가움", "눈물"],
+    "greasy": ["greasy", "oily", "shiny", "heavy", "번들", "기름짐", "유분", "무거움"],
+    "drying": ["dry", "drying", "tight", "flaky", "건조", "당김", "각질"],
+    "irritation": ["irritation", "irritated", "rash", "redness", "sensitive", "자극", "따가움", "붉어짐", "민감"],
+    "fragrance": ["fragrance", "perfume", "scent", "smell", "향", "향료", "냄새"],
+}
+
+# (선택) 니즈/선호 lexicon이 필요하면 여기 추가로 확장 가능
+NEED_LEX = {
+    "soothing": ["soothing", "calming", "cica", "centella", "진정", "시카", "민감"],
+    "no_white_cast": ["no white cast", "zero white cast", "transparent", "백탁 없음", "백탁 적음"],
+    "light_texture": ["light", "lightweight", "watery", "serum", "가벼움", "워터리", "산뜻"],
+    "tone_up": ["tone up", "tone-up", "톤업"],
+}
+
+# --- Default lexicons (hotfix: prevent NameError) ---
+DEFAULT_RISK_LEX = {
+    "white_cast": ["white cast", "whitecast", "ashy", "gray cast", "톤업 과함", "백탁", "회색끼"],
+    "pilling": ["pilling", "pill", "balls up", "rolling", "밀림", "때처럼", "각질처럼"],
+    "breakouts": ["breakout", "breakouts", "acne", "pimples", "clog", "comedone", "트러블", "여드름", "모공 막힘"],
+    "stings_eyes": ["stings eyes", "burns eyes", "eye sting", "irritates eyes", "눈시림", "눈 따가움", "눈물"],
+    "greasy": ["greasy", "oily", "shiny", "heavy", "번들", "기름짐", "유분", "무거움"],
+    "drying": ["dry", "drying", "tight", "flaky", "건조", "당김", "각질"],
+    "irritation": ["irritation", "irritated", "rash", "redness", "sensitive", "자극", "따가움", "붉어짐", "민감"],
+    "fragrance": ["fragrance", "perfume", "scent", "smell", "향", "향료", "냄새"],
+}
+
+
+# --- Relevance filtering for social signals ---
+import re
+from urllib.parse import urlparse
+
+BLACKLIST_DOMAINS = {"wogame.store", "wordens.wogame.store"}
+
+def _tokenize_query(q: str):
+  q = (q or "").lower()
+  toks = [t for t in re.split(r"[^a-z0-9가-힣]+", q) if len(t) >= 3]
+  return toks
+
+def _looks_like_spam(sig: dict) -> bool:
+  url = (sig.get("url") or "").strip()
+  if url:
+    d = urlparse(url).netloc.lower()
+    if any(bad in d for bad in BLACKLIST_DOMAINS):
+      return True
+  title = (sig.get("title") or "").lower()
+  text = (sig.get("text") or sig.get("body") or "").lower()
+  if "read online" in title or "prologue" in title or "read online" in text:
+    return True
+  return False
+
+def _is_relevant(sig: dict, q: str) -> bool:
+  if not isinstance(sig, dict):
+    return False
+  if _looks_like_spam(sig):
+    return False
+
+  toks = _tokenize_query(q)
+  hay = ((sig.get("title") or "") + " " + (sig.get("text") or sig.get("body") or "")).lower()
+
+  must = ["sunscreen","spf","uv","sun","white cast","sensitive","korean","k-beauty","skincare"]
+  if not any(m in hay for m in must):
+    if toks and not any(t in hay for t in toks):
+      return False
+
+  if toks and not any(t in hay for t in toks):
+    return False
+
+  return True
+
+def clean_signals(signals: list, query: str):
+  seen = set()
+  out = []
+  dropped = 0
+  for s in signals or []:
+    if not isinstance(s, dict):
+      dropped += 1
+      continue
+    url = (s.get("url") or "").strip()
+    if url and url in seen:
+      dropped += 1
+      continue
+    if not _is_relevant(s, query):
+      dropped += 1
+      continue
+    if url:
+      seen.add(url)
+    out.append(s)
+  return out, dropped
+
+# ===== BEGIN_OVERRIDE_CLEAN_V2 =====
+# This block is appended by patch_fix_noise_and_mojibake.ps1
+# It overrides filtering + pulse titles safely (last-definition wins).
+
+import re
+from urllib.parse import urlparse
+
+NEGATIVE_KEYWORDS = [
+  "read online", "prologue", "novel", "romance", "shortstory",
+  "microsoft rewards", "egift", "beermoney", "robisons", "robinsons",
+  "giveaway", "coupon", "promo code"
+]
+
+BLACKLIST_DOMAINS = {
+  "wogame.store", "wordens.wogame.store"
+}
+
+def _tokenize_query_v2(q: str):
+  q = (q or "").lower()
+  toks = [t for t in re.split(r"[^a-z0-9가-힣]+", q) if len(t) >= 3]
+  # 너무 흔한 토큰 제거(잡음 방지)
+  stop = {"korean", "beauty", "k", "be", "skin", "care"}
+  return [t for t in toks if t not in stop]
+
+def _looks_like_spam_v2(sig: dict) -> bool:
+  url = (sig.get("url") or "").strip()
+  if url:
+    d = urlparse(url).netloc.lower()
+    if any(bad in d for bad in BLACKLIST_DOMAINS):
+      return True
+
+  title = (sig.get("title") or "").lower()
+  text = (sig.get("text") or sig.get("body") or "").lower()
+  hay = title + " " + text
+
+  for kw in NEGATIVE_KEYWORDS:
+    if kw in hay:
+      return True
+  return False
+
+def _is_relevant_v2(sig: dict, q: str) -> bool:
+  if not isinstance(sig, dict):
+    return False
+  if _looks_like_spam_v2(sig):
+    return False
+
+  title = (sig.get("title") or "").lower()
+  text = (sig.get("text") or sig.get("body") or "").lower()
+  hay = title + " " + text
+
+  # "선케어/스킨케어" 컨텍스트 최소 조건 강화
+  must_any = [
+    "sunscreen", "sun screen", "spf", "uv", "uva", "uvb",
+    "skincare", "skin care", "skin", "dermat", "moistur", "irritat",
+    "white cast", "sensitive"
+  ]
+  if not any(m in hay for m in must_any):
+    return False
+
+  # query 토큰 최소 2개 이상 매칭(잡음 제거)
+  toks = _tokenize_query_v2(q)
+  if toks:
+    hit = sum(1 for t in toks if t in hay)
+    if hit < min(2, len(toks)):  # 토큰이 많을수록 더 엄격
+      return False
+
+  return True
+
+def clean_signals(signals: list, query: str):
+  seen = set()
+  out = []
+  dropped = 0
+  for s in (signals or []):
+    if not isinstance(s, dict):
+      dropped += 1
+      continue
+    url = (s.get("url") or "").strip()
+    if url and url in seen:
+      dropped += 1
+      continue
+    if not _is_relevant_v2(s, query):
+      dropped += 1
+      continue
+    if url:
+      seen.add(url)
+    out.append(s)
+  return out, dropped
+
+def fetch_social_signals(query: str, limit: int = 25):
+  """
+  Unified signals fetcher: Reddit -> clean_signals (V2 strict)
+  """
+  q = (query or "").strip()
+  lim = max(1, min(int(limit or 25), 200))
+  raw = fetch_reddit(q, limit=lim) if "fetch_reddit" in globals() and callable(globals().get("fetch_reddit")) else []
+  cleaned, _dropped = clean_signals(raw, q)
+  return cleaned
+
+# Fix mojibake: override titles/summaries to ASCII (stable in any encoding)
+try:
+  _build_pulse_from_signals_old = build_pulse_from_signals
+except Exception:
+  _build_pulse_from_signals_old = None
+
+def build_pulse_from_signals(signals):
+  pulse = _build_pulse_from_signals_old(signals) if _build_pulse_from_signals_old else {"insights": []}
+  ins = pulse.get("insights") or []
+  if isinstance(ins, list):
+    if len(ins) >= 1 and isinstance(ins[0], dict):
+      ins[0]["title"] = "Top customer expectations (needs)"
+      ins[0]["summary"] = "Most repeated need keywords observed in social/retail signals."
+    if len(ins) >= 2 and isinstance(ins[1], dict):
+      ins[1]["title"] = "Top review risks / FAQ triggers"
+      ins[1]["summary"] = "Most repeated complaint/risk keywords observed."
+    pulse["insights"] = ins
+  return pulse
+
+# ===== END_OVERRIDE_CLEAN_V2 =====
+
