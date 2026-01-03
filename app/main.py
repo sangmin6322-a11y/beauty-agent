@@ -12,7 +12,7 @@ import re
 import re
 import json
 from app.db import init_db, insert_log, fetch_logs
-from app.signals import fetch_reddit, build_pulse_from_signals, build_alerts_from_signals
+from app.signals import fetch_reddit, build_pulse_from_signals, build_alerts_from_signals, fetch_social_signals
 from app.insights import make_pulse, make_alerts
 
 def respond(session, state, message, reply):
@@ -628,3 +628,29 @@ def report_cards(user_id: str, query: str, limit: int = 25):
 
 # ===== END_REPORT_CARDS_V1 =====
 
+
+# ===== BEGIN_HEALTH_V2 =====
+@app.get("/health")
+def health():
+    return {"ok": True}
+# ===== END_HEALTH_V2 =====
+# ===== BEGIN_PULSE_POST_ALIAS_V2 =====
+@app.post("/pulse")
+def pulse_post(payload: dict):
+    query = (payload.get("query") or "").strip()
+    limit = int(payload.get("limit") or 25)
+    limit = max(1, min(limit, 200))
+    signals = fetch_social_signals(query, limit=limit) if query else []
+    pulse = build_pulse_from_signals(signals)
+    pulse["signals_count"] = len(signals)
+    pulse["evidence"] = [
+      {
+        "platform": s.get("platform") or s.get("source") or "reddit",
+        "title": s.get("title") or "",
+        "url": s.get("url") or "",
+        "snippet": (s.get("text") or s.get("body") or "")[:240],
+      }
+      for s in (signals or [])[:10] if isinstance(s, dict)
+    ]
+    return pulse
+# ===== END_PULSE_POST_ALIAS_V2 =====

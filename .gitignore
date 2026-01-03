@@ -30,3 +30,6 @@ patch_*.ps1
 *.ps1.bak_*
 app/*.bak_*
 app/static/*.bak_*
+# --- local patch artifacts ---
+*.bak_*
+*.ps1

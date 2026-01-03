@@ -425,3 +425,98 @@ def build_pulse_from_signals(signals):
 
 # ===== END_OVERRIDE_CLEAN_V2 =====
 
+
+# ===== BEGIN_SIGNALS_STABILITY_V2 =====
+import re as _re
+from urllib.parse import urlparse as _urlparse
+
+BLACKLIST_DOMAINS = {"wogame.store","wordens.wogame.store"}
+
+if "RISK_LEX" not in globals():
+    RISK_LEX = {
+      "white_cast": ["white cast","ashy","gray cast","purple cast"],
+      "pilling": ["pilling","pills up","ball up","peeling off"],
+      "breakouts": ["breakout","breakouts","acne","clog","comedone","whitehead","blackhead"],
+      "stings_eyes": ["stings eyes","burns eyes","eye sting","watering eyes"],
+      "greasy": ["greasy","oily","shiny","heavy"],
+      "drying": ["drying","tight","dehydrating","flakes"],
+      "irritation": ["irritation","irritated","rash","redness","itch","itchy"],
+      "fragrance": ["fragrance","perfume","scent","smell"],
+    }
+
+if "NEED_LEX" not in globals():
+    NEED_LEX = {
+      "sensitive": ["sensitive","reactive","gentle","soothing","calming"],
+      "no_white_cast": ["no white cast","zero white cast","invisible","clear finish"],
+      "light_texture": ["lightweight","non-greasy","fast absorbing","weightless"],
+      "hydrating": ["hydrating","moisturizing","dewy"],
+      "oil_control": ["oil control","matte","not shiny"],
+      "no_eye_sting": ["no eye sting","doesn't sting eyes","eye-safe"],
+    }
+
+def _looks_like_spam(sig: dict) -> bool:
+    url = (sig.get("url") or "").strip()
+    if url:
+        d = _urlparse(url).netloc.lower()
+        if any(bad in d for bad in BLACKLIST_DOMAINS):
+            return True
+    title = (sig.get("title") or "").lower()
+    text = (sig.get("text") or sig.get("body") or "").lower()
+    if ("read online" in title) or ("read online" in text) or ("prologue" in title):
+        return True
+    return False
+
+def clean_signals(signals: list, query: str):
+    q = (query or "").lower()
+    toks = [t for t in _re.split(r"[^a-z0-9가-힣]+", q) if len(t) >= 3]
+    must = ["sunscreen","spf","uv","sun","white cast","sensitive","korean","k-beauty","skincare"]
+
+    out, seen, dropped = [], set(), 0
+    for s in (signals or []):
+        if not isinstance(s, dict):
+            dropped += 1; continue
+        if _looks_like_spam(s):
+            dropped += 1; continue
+
+        hay = ((s.get("title") or "") + " " + (s.get("text") or s.get("body") or "")).lower()
+        if toks and not any(t in hay for t in toks):
+            dropped += 1; continue
+        if not any(m in hay for m in must) and toks:
+            dropped += 1; continue
+
+        url = (s.get("url") or "").strip()
+        if url and url in seen:
+            dropped += 1; continue
+        if url: seen.add(url)
+
+        out.append(s)
+    return out, dropped
+
+def fetch_social_signals(query: str, limit: int = 25):
+    q = (query or "").strip()
+    lim = max(1, min(int(limit or 25), 200))
+    raw = fetch_reddit(q, limit=lim) if "fetch_reddit" in globals() and callable(globals().get("fetch_reddit")) else []
+    cleaned, _d = clean_signals(raw, q) if "clean_signals" in globals() else (raw, 0)
+    return cleaned
+
+# 안정적인 pulse 출력(Need/Risk 2장)
+def build_pulse_from_signals(signals: list):
+    def _count_lex(signals, lex):
+        cnt = {}
+        for s in (signals or []):
+            if not isinstance(s, dict): continue
+            hay = ((s.get("title") or "") + " " + (s.get("text") or s.get("body") or "")).lower()
+            for k, terms in (lex or {}).items():
+                for t in terms:
+                    if t in hay:
+                        cnt[k] = cnt.get(k, 0) + 1
+                        break
+        return sorted(cnt.items(), key=lambda x: x[1], reverse=True)
+
+    needs_top = _count_lex(signals, NEED_LEX)[:10]
+    risks_top = _count_lex(signals, RISK_LEX)[:10]
+    return {"insights":[
+      {"kind":"needs","title":"Top Needs","summary":"Repeated expectations from social signals.","top":needs_top,"evidence":[]},
+      {"kind":"risks","title":"Top Risks","summary":"Repeated complaint/risk mentions.","top":risks_top,"evidence":[]},
+    ]}
+# ===== END_SIGNALS_STABILITY_V2 =====

@@ -200,6 +200,60 @@
 })();
 </script>
 <!-- ===== END_REPORT_BUTTON_V1 ===== -->
+
+<!-- ===== BEGIN_REPORT_BUTTON_V2 ===== -->
+<style>
+  #finalReportBtn{
+    position:fixed; right:18px; bottom:18px; z-index:9999;
+    padding:12px 14px; border-radius:999px;
+    border:1px solid rgba(255,255,255,.18);
+    background:rgba(20,20,24,.92);
+    color:rgba(255,255,255,.92);
+    font-weight:900; cursor:pointer;
+    box-shadow:0 10px 28px rgba(0,0,0,.35);
+    backdrop-filter: blur(8px);
+  }
+</style>
+<button id="finalReportBtn" title="마지막 query로 카드뉴스 리포트 열기">📌 최종 리포트 요약</button>
+<script>
+(function(){
+  function pickValue(selectors){
+    for (const sel of selectors){
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const v = (el.value ?? el.textContent ?? "").toString().trim();
+      if (v) return v;
+    }
+    return "";
+  }
+  function lastQuery(){ try { return (localStorage.getItem("last_query")||"").trim(); } catch(e){ return ""; } }
+  function setLastQuery(q){ try { localStorage.setItem("last_query", q); } catch(e){} }
+
+  document.addEventListener("input", function(ev){
+    const t = ev.target;
+    if (!t) return;
+    const id = (t.id || "").toLowerCase();
+    if (id.includes("query") || id.includes("message") || id.includes("input") || t.tagName === "TEXTAREA"){
+      const v = (t.value || "").trim();
+      if (v.length >= 3) setLastQuery(v);
+    }
+  }, true);
+
+  document.getElementById("finalReportBtn").addEventListener("click", function(){
+    let q = pickValue(["#query","#message","#msg","#input","#text","textarea"]) || lastQuery();
+    if (!q){
+      q = prompt("리포트 생성할 검색 키워드 입력") || "";
+      q = q.trim();
+      if (!q) { alert("query가 비어있음"); return; }
+      setLastQuery(q);
+    }
+    const url = "/report/cards?user_id=test&query=" + encodeURIComponent(q) + "&limit=25";
+    window.open(url, "_blank");
+  });
+})();
+</script>
+<!-- ===== END_REPORT_BUTTON_V2 ===== -->
 </body>
 </html>
+
 
