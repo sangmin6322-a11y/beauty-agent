@@ -10,3 +10,13 @@ __pycache__/
 data/
 payload*.json
 make_payload*.py
+# local test payloads (do not commit)
+m1.json
+m2.json
+m3.json
+reset.json
+radar.json
+make_m1.py
+make_m2.py
+make_m3.py
+make_reset.py
