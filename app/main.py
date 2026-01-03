@@ -5,9 +5,13 @@ from enum import Enum
 from typing import Dict
 
 import os
+import json
+from app.db import init_db, insert_log, fetch_logs
 from app.llm import call_llm
 
 app = FastAPI(title="Beauty Agent", version="0.3.1")
+
+init_db()
 
 class State(str, Enum):
     CHAT = "CHAT"
@@ -51,7 +55,7 @@ def chat(payload: ChatIn):
         session.state = State.CHAT
         session.slots = {}
         session.pending_slot = None
-        return ChatOut(user_id=session.user_id, state="CHAT", reply="초기화했어. 다시 말해줘.")
+        return respond(session, "CHAT", msg, "초기화했어. 다시 말해줘.")
 
     # BRIEF: 사용자가 답하면 pending_slot에 저장 후 다음 행동을 LLM에 요청
     if session.state == State.BRIEF:
@@ -64,11 +68,11 @@ def chat(payload: ChatIn):
         if data.get("final"):
             session.state = State.CHAT
             session.pending_slot = None
-            return ChatOut(user_id=session.user_id, state="CHAT", reply=data.get("reply", ""))
+            return respond(session, "CHAT", msg, data.get("reply", ""))
 
         # 계속 질문
         session.pending_slot = data.get("slot") or "misc"
-        return ChatOut(user_id=session.user_id, state="BRIEF", reply=data.get("question") or "한 가지만 더 알려줘.")
+        return respond(session, "BRIEF", msg, data.get("question") or "한 가지만 더 알려줘.")
 
     # CHAT: LLM이 라우팅
     data = call_llm(user_message=msg, brief_answers=[])
@@ -76,9 +80,9 @@ def chat(payload: ChatIn):
     if data.get("need_question"):
         session.state = State.BRIEF
         session.pending_slot = data.get("slot") or "misc"
-        return ChatOut(user_id=session.user_id, state="BRIEF", reply=data.get("question") or "몇 가지만 물어볼게.")
+        return respond(session, "BRIEF", msg, data.get("question") or "몇 가지만 물어볼게.")
 
-    return ChatOut(user_id=session.user_id, state="CHAT", reply=data.get("reply", ""))
+    return respond(session, "CHAT", msg, data.get("reply", ""))
 
 @app.get("/")
 def root():
@@ -87,3 +91,22 @@ def root():
         "status": "ok",
         "endpoints": ["/health", "/chat"]
     }
+
+
+
+
+def respond(session: Session, state: str, message: str, reply: str):
+    slots_json = json.dumps(session.slots, ensure_ascii=False) if session.slots else None
+    insert_log(session.user_id, state, message, reply, slots_json)
+    return ChatOut(user_id=session.user_id, state=state, reply=reply)
+
+from fastapi import Query
+
+@app.get("/history")
+def history(user_id: str, limit: int = Query(20, ge=1, le=200)):
+    rows = fetch_logs(user_id, limit)
+    return [
+        {"ts": ts, "state": state, "message": message, "reply": reply, "slots_json": slots_json}
+        for (ts, state, message, reply, slots_json) in rows
+    ]
+
