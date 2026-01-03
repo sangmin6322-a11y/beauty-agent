@@ -12,6 +12,7 @@ import re
 import json
 from app.db import init_db, insert_log, fetch_logs
 from app.llm import call_llm, call_radar
+from app.slots import extract_slots_from_text
 
 def normalize_log_row(row):
     """
@@ -257,6 +258,7 @@ async def debug_radar(req: Request):
 
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()}
+
 
 
 
