@@ -43,9 +43,30 @@ def insert_log(user_id: str, state: str, message: str, reply: str, slots_json: s
         con.commit()
 
 def fetch_logs(user_id: str, limit: int = 20):
-    with get_con() as con:
-        cur = con.execute(
-            "SELECT ts, state, message, reply, slots_json FROM chat_logs WHERE user_id=? ORDER BY id DESC LIMIT ?",
-            (user_id, limit),
-        )
-        return cur.fetchall()
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT ts, state, message, reply, slots_json
+        FROM chat_logs
+        WHERE user_id = ?
+        ORDER BY ts DESC
+        LIMIT ?
+        """,
+        (user_id, limit),
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    # tuple -> dict 로 변환해서 반환 (main.py에서 row.get(...) 가능)
+    out = []
+    for (ts, state, message, reply, slots_json) in rows:
+        out.append({
+            "ts": ts,
+            "state": state,
+            "message": message,
+            "reply": reply,
+            "slots_json": slots_json,
+        })
+    return out
+
