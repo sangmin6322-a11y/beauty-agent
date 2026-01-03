@@ -1,5 +1,5 @@
 ﻿from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 import traceback
 from pydantic import BaseModel
 from dataclasses import dataclass, field
@@ -184,23 +184,15 @@ def chat(payload: ChatIn):
 
     return respond(session, "CHAT", msg, data.get("reply", ""))
 
-@app.get("/")
-def root():
-    return {
-        "name": "Beauty Agent",
-        "status": "ok",
-        "endpoints": ["/health", "/chat"]
-    }
+@app.get("/", include_in_schema=False)
+def home():
+    import os
+    here = os.path.dirname(__file__)
+    return FileResponse(os.path.join(here, "static", "index.html"))
 
-
-
-
-def respond(session: Session, state: str, message: str, reply: str):
-    slots_json = json.dumps(session.slots, ensure_ascii=False) if session.slots else None
-    insert_log(session.user_id, state, message, reply, slots_json)
-    return ChatOut(user_id=session.user_id, state=state, reply=reply)
-
-from fastapi import Query
+@app.get("/api", include_in_schema=False)
+def api_meta():
+    return {"name":"Beauty Agent","status":"ok","endpoints":["/health","/chat","/history","/radar"]}
 @app.get("/history")
 def history(user_id: str, limit: int = 20):
     return fetch_logs(user_id=user_id, limit=limit)
@@ -259,6 +251,7 @@ async def debug_radar(req: Request):
 
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()}
+
 
 
 
