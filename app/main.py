@@ -73,7 +73,11 @@ def chat(payload: ChatIn):
         # 계속 질문
         q = data.get("question") or ""
 
-        session.pending_slot = data.get("slot") or infer_slot(q)
+        inferred = infer_slot(q)
+
+        slot = data.get("slot")
+
+        session.pending_slot = inferred if inferred != "misc" else (slot or "misc")
         return respond(session, "BRIEF", msg, data.get("question") or "한 가지만 더 알려줘.")
 
     # CHAT: LLM이 라우팅
@@ -83,7 +87,11 @@ def chat(payload: ChatIn):
         session.state = State.BRIEF
         q = data.get("question") or ""
 
-        session.pending_slot = data.get("slot") or infer_slot(q)
+        inferred = infer_slot(q)
+
+        slot = data.get("slot")
+
+        session.pending_slot = inferred if inferred != "misc" else (slot or "misc")
         return respond(session, "BRIEF", msg, data.get("question") or "몇 가지만 물어볼게.")
 
     return respond(session, "CHAT", msg, data.get("reply", ""))
@@ -130,5 +138,6 @@ def infer_slot(question: str) -> str:
     if "니즈" in question or "문제" in question or "need" in q:
         return "need"
     return "misc"
+
 
 
