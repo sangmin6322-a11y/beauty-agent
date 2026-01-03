@@ -1,5 +1,49 @@
 ﻿import re
 
+REQUIRED_SLOTS = ["country", "category", "target", "need", "price", "channel"]
+
+def infer_slot(question: str) -> str:
+    q = (question or "").lower()
+    if ("국가" in question) or ("지역" in question) or ("country" in q) or ("region" in q):
+        return "country"
+    if ("카테고리" in question) or ("선크림" in question) or ("선스틱" in question) or ("category" in q):
+        return "category"
+    if ("가격" in question) or ("price" in q) or ("만원" in question):
+        return "price"
+    if ("채널" in question) or ("유통" in question) or ("amazon" in q) or ("올리브영" in question) or ("channel" in q):
+        return "channel"
+    if ("타겟" in question) or ("고객" in question) or ("target" in q):
+        return "target"
+    if ("니즈" in question) or ("문제" in question) or ("need" in q):
+        return "need"
+    return "misc"
+
+def has_required_slots(slots: dict) -> bool:
+    return all(slots.get(k) for k in REQUIRED_SLOTS)
+
+def render_launch_brief(slots: dict) -> str:
+    country = slots.get("country", "N/A")
+    category = slots.get("category", "N/A")
+    target = slots.get("target", "N/A")
+    need = slots.get("need", "N/A")
+    price = slots.get("price", "N/A")
+    channel = slots.get("channel", "N/A")
+
+    core_claim = f"{target}을 위한 {need} 컨셉의 {category}"
+    next_action = "경쟁 제품/리뷰 기반 USP 3개 확정"
+
+    return (
+        "[Launch Brief]\n"
+        f"- Country/Region: {country}\n"
+        f"- Category: {category}\n"
+        f"- Target: {target}\n"
+        f"- Key Need: {need}\n"
+        f"- Price Band: {price}\n"
+        f"- Channel Mix: {channel}\n"
+        f"- Core Claim (한 문장): {core_claim}\n"
+        f"- Next Action (1개): {next_action}\n"
+    )
+
 def extract_slots_from_text(text: str) -> dict:
     t = (text or "").strip()
     tl = t.lower()
