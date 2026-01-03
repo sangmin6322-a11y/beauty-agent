@@ -51,7 +51,7 @@ def normalize_log_row(row):
     return {"ts": None, "state": None, "message": None, "reply": str(row), "slots_json": None}
 
 
-app = FastAPI(title="Beauty Agent", version="0.3.1")
+app = FastAPI(title="Beauty Agent", version="0.3.2")
 
 init_db()
 
@@ -90,7 +90,7 @@ class RadarOut(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "version": "0.3.1"}
+    return {"ok": True, "version": "0.3.2"}
 
 @app.post("/chat", response_model=ChatOut)
 def chat(payload: ChatIn):
@@ -357,5 +357,6 @@ async def debug_radar(req: Request):
 
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()}
+
 
 
