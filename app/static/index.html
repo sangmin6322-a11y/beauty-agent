@@ -4,186 +4,47 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Beauty Agent</title>
-  <style>
-    :root { --bg:#0b1020; --card:#111a33; --muted:#a9b3d6; --text:#e9edff; --accent:#7aa2ff; }
-    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Apple SD Gothic Neo, "Noto Sans KR", sans-serif;
-           background: radial-gradient(1200px 800px at 20% 10%, #16224a 0%, var(--bg) 45%, #070b16 100%);
-           color: var(--text); }
-    .wrap { max-width: 980px; margin: 0 auto; padding: 24px; }
-    .top { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px; }
-    .brand { display:flex; align-items:center; gap:12px; }
-    .logo { width:38px; height:38px; border-radius:12px; background: linear-gradient(135deg, #7aa2ff, #a78bfa); box-shadow: 0 8px 30px rgba(122,162,255,.35); }
-    h1 { font-size: 20px; margin:0; letter-spacing:.2px; }
-    .sub { color: var(--muted); font-size: 12px; margin-top:2px; }
-    .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    input, button, textarea { border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: rgba(17,26,51,.7); color: var(--text); }
-    input { padding: 10px 12px; outline:none; }
-    button { padding: 10px 12px; cursor:pointer; }
-    button:hover { border-color: rgba(122,162,255,.55); }
-    .pill { font-size:12px; color: var(--muted); padding: 8px 10px; border:1px dashed rgba(255,255,255,.16); border-radius:999px; }
-    .grid { display:grid; grid-template-columns: 1fr; gap:14px; }
-    .panel { background: rgba(17,26,51,.55); border: 1px solid rgba(255,255,255,.10); border-radius: 18px; overflow:hidden; box-shadow: 0 18px 50px rgba(0,0,0,.35); }
-    .chat { height: 520px; overflow:auto; padding: 16px; }
-    .msg { display:flex; gap:10px; margin: 10px 0; }
-    .me { justify-content:flex-end; }
-    .bubble { max-width: 78%; padding: 10px 12px; border-radius: 14px; line-height: 1.35; white-space: pre-wrap; }
-    .me .bubble { background: rgba(122,162,255,.22); border:1px solid rgba(122,162,255,.35); }
-    .bot .bubble { background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10); }
-    .meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
-    .composer { display:flex; gap:10px; padding: 12px; border-top: 1px solid rgba(255,255,255,.10); }
-    .composer textarea { flex:1; padding: 10px 12px; resize:none; outline:none; height: 44px; }
-    .right { display:flex; gap:10px; }
-    .ok { color:#a7f3d0; }
-    .err { color:#fecaca; }
-    a { color: var(--accent); text-decoration:none; }
-  </style>
+  <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
   <div class="wrap">
-    <div class="top">
+    <header class="top">
       <div class="brand">
         <div class="logo"></div>
         <div>
-          <h1>Beauty Agent</h1>
-          <div class="sub">Launch Brief → Radar 까지 한 번에</div>
+          <div class="title">Beauty Agent</div>
+          <div class="subtitle">Retail + 리뷰 + SNS 신호 → Launch Brief / Radar / Pulse / Alerts</div>
         </div>
       </div>
 
-      <div class="bar">
-        <span class="pill">API: <a href="/docs" target="_blank">/docs</a> · <a href="/health" target="_blank">/health</a></span>
-        <input id="userId" placeholder="user_id (예: test)" />
-        <button id="btnHistory">History</button>
-        <button id="btnRadar">Radar</button>
-        <button id="btnReset">Reset</button>
+      <div class="controls">
+        <input id="userId" class="input" value="test" />
+        <button id="btnHistory" class="btn ghost">History</button>
+        <button id="btnRadar" class="btn ghost">Radar</button>
+        <button id="btnPulse" class="btn ghost">Pulse</button>
+        <button id="btnAlerts" class="btn ghost">Alerts</button>
+        <button id="btnReset" class="btn">Reset</button>
       </div>
-    </div>
+    </header>
 
-    <div class="grid">
-      <div class="panel">
-        <div id="chat" class="chat"></div>
-        <div class="composer">
-          <textarea id="msg" placeholder="예) 미국에서 민감피부용 선크림 런칭…"></textarea>
-          <div class="right">
-            <button id="btnSend">Send</button>
-          </div>
-        </div>
+    <main class="panel">
+      <div id="chat" class="chat"></div>
+
+      <div class="composer">
+        <input id="msg" class="input grow" placeholder="예) 미국에서 선케어 신제품 기획하려고 해" />
+        <button id="send" class="btn">Send</button>
       </div>
-      <div id="status" class="meta"></div>
-    </div>
+    </main>
+
+    <footer class="foot">
+      <a href="/docs" target="_blank">API Docs</a>
+      <span>·</span>
+      <a href="/health" target="_blank">Health</a>
+      <span>·</span>
+      <a href="/api" target="_blank">API Root</a>
+    </footer>
   </div>
 
-<script>
-  const $ = (id) => document.getElementById(id);
-  const chat = $("chat");
-  const status = $("status");
-  const userId = $("userId");
-  const msg = $("msg");
-
-  userId.value = localStorage.getItem("beauty_user_id") || "test";
-  userId.addEventListener("change", () => localStorage.setItem("beauty_user_id", userId.value.trim()));
-
-  function addBubble(role, text) {
-    const row = document.createElement("div");
-    row.className = "msg " + (role === "me" ? "me" : "bot");
-    const b = document.createElement("div");
-    b.className = "bubble";
-    b.textContent = text;
-    row.appendChild(b);
-    chat.appendChild(row);
-    chat.scrollTop = chat.scrollHeight;
-  }
-
-  function setStatus(text, ok=true) {
-    status.innerHTML = `<span class="${ok ? "ok" : "err"}">${text}</span>`;
-  }
-
-  async function postJson(path, body) {
-    const r = await fetch(path, {
-      method: "POST",
-      headers: {"Content-Type":"application/json; charset=utf-8"},
-      body: JSON.stringify(body)
-    });
-    const txt = await r.text();
-    let data;
-    try { data = JSON.parse(txt); } catch(e){ data = {raw: txt}; }
-    if (!r.ok) throw new Error(data.error || data.detail || txt);
-    return data;
-  }
-
-  async function getJson(url) {
-    const r = await fetch(url);
-    const txt = await r.text();
-    let data;
-    try { data = JSON.parse(txt); } catch(e){ data = {raw: txt}; }
-    if (!r.ok) throw new Error(data.error || data.detail || txt);
-    return data;
-  }
-
-  async function sendMessage() {
-    const uid = userId.value.trim() || "test";
-    const text = msg.value.trim();
-    if (!text) return;
-    addBubble("me", text);
-    msg.value = "";
-    setStatus("요청 중…");
-
-    try {
-      const data = await postJson("/chat", {user_id: uid, message: text});
-      addBubble("bot", data.reply || "(no reply)");
-      setStatus(`OK · state=${data.state || "?"}`);
-    } catch (e) {
-      addBubble("bot", "에러: " + e.message);
-      setStatus("에러 발생", false);
-    }
-  }
-
-  $("btnSend").addEventListener("click", sendMessage);
-  msg.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-  });
-
-  $("btnReset").addEventListener("click", async () => {
-    msg.value = "/reset";
-    await sendMessage();
-  });
-
-  $("btnHistory").addEventListener("click", async () => {
-    const uid = userId.value.trim() || "test";
-    setStatus("히스토리 불러오는 중…");
-    try {
-      const rows = await getJson(`/history?user_id=${encodeURIComponent(uid)}&limit=20`);
-      chat.innerHTML = "";
-      rows.forEach(r => {
-        addBubble("me", r.message);
-        addBubble("bot", r.reply);
-      });
-      setStatus("History OK");
-    } catch (e) {
-      setStatus("History 에러: " + e.message, false);
-    }
-  });
-
-  $("btnRadar").addEventListener("click", async () => {
-    const uid = userId.value.trim() || "test";
-    setStatus("Radar 생성 중…");
-    try {
-      const data = await postJson("/radar", {user_id: uid});
-      addBubble("bot", data.reply || "(no radar)");
-      setStatus("Radar OK");
-    } catch (e) {
-      setStatus("Radar 에러: " + e.message, false);
-    }
-  });
-
-  // 첫 로드: 간단 핑
-  (async () => {
-    try {
-      const h = await getJson("/health");
-      setStatus(`서버 연결됨 · version=${h.version}`);
-    } catch (e) {
-      setStatus("서버 연결 실패: " + e.message, false);
-    }
-  })();
-</script>
+  <script src="/static/app.js"></script>
 </body>
 </html>

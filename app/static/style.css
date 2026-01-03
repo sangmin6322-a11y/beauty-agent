@@ -1,0 +1,72 @@
+﻿:root{
+  --bg:#0b1220;
+  --card:#0f1b33;
+  --line:rgba(255,255,255,.08);
+  --text:rgba(255,255,255,.92);
+  --muted:rgba(255,255,255,.62);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR";
+  background: radial-gradient(1000px 500px at 20% -10%, #1c2a52, transparent),
+              radial-gradient(700px 400px at 80% 10%, #22336a, transparent),
+              var(--bg);
+  color:var(--text);
+}
+.wrap{max-width:1100px; margin:0 auto; padding:28px}
+.top{
+  display:flex; gap:16px; align-items:center; justify-content:space-between;
+  padding:18px 18px; border:1px solid var(--line); border-radius:18px; background:rgba(15,27,51,.6);
+  backdrop-filter: blur(10px);
+}
+.brand{display:flex; gap:14px; align-items:center}
+.logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#7c9cff,#b58cff)}
+.title{font-size:22px;font-weight:800}
+.subtitle{color:var(--muted); font-size:13px; margin-top:2px}
+.controls{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+.input{
+  background:rgba(255,255,255,.06); color:var(--text);
+  border:1px solid var(--line); border-radius:12px;
+  padding:10px 12px; outline:none;
+}
+.input.grow{flex:1}
+.btn{
+  border:1px solid rgba(124,156,255,.55);
+  background:rgba(124,156,255,.18);
+  color:var(--text);
+  padding:10px 12px;
+  border-radius:12px;
+  cursor:pointer;
+}
+.btn.ghost{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.06);
+}
+.panel{
+  margin-top:16px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:rgba(15,27,51,.55);
+  overflow:hidden;
+}
+.chat{height:520px; overflow:auto; padding:18px}
+.row{display:flex; margin:10px 0}
+.row.me{justify-content:flex-end}
+.bubble{
+  max-width:78%;
+  padding:12px 14px;
+  border-radius:16px;
+  white-space:pre-wrap;
+  border:1px solid var(--line);
+}
+.bubble.bot{background:rgba(255,255,255,.06)}
+.bubble.me{
+  background:rgba(124,156,255,.20);
+  border:1px solid rgba(124,156,255,.50);
+}
+.composer{
+  display:flex; gap:10px; padding:14px;
+  border-top:1px solid var(--line);
+}
+.foot{margin-top:10px; color:var(--muted); display:flex; gap:10px; align-items:center}
+.foot a{color:rgba(255,255,255,.75); text-decoration:none}

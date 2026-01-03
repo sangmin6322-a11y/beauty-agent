@@ -1,4 +1,5 @@
 ﻿from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
 import traceback
 from pydantic import BaseModel
@@ -11,6 +12,7 @@ import re
 import re
 import json
 from app.db import init_db, insert_log, fetch_logs
+from app.insights import make_pulse, make_alerts
 
 def respond(session, state, message, reply):
     """
@@ -76,6 +78,7 @@ def normalize_log_row(row):
 
 
 app = FastAPI(title="Beauty Agent", version="0.3.3")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request, exc):
@@ -245,6 +248,7 @@ def radar(payload: RadarIn):
 
 # ---- DEBUG ENDPOINTS (temporary) ----
 from fastapi import Request
+from fastapi.staticfiles import StaticFiles
 import traceback
 
 @app.post("/debug/radar")
@@ -279,4 +283,16 @@ async def debug_radar(req: Request):
 
 
 
+
+
+
+@app.get("/pulse")
+def pulse(user_id: str, limit: int = 50):
+    rows = fetch_logs(user_id=user_id, limit=limit)
+    return make_pulse(rows)
+
+@app.get("/alerts")
+def alerts(user_id: str, limit: int = 50):
+    rows = fetch_logs(user_id=user_id, limit=limit)
+    return make_alerts(rows)
 
